@@ -1,3 +1,5 @@
+A continuation of stalled spiral mandel slice animation energy, as a fork off SMM's first/only NFT:
+
 # julia_evolution
 Julia Evolution: r:0.678-0.68166 theta:5.95-6.065
 
