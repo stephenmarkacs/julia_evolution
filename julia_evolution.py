@@ -29,7 +29,7 @@ RMAX = 0.68168
 DRDTHETA = 0.1 / math.pi
 
 # canvas 
-W = 50
+W = 800
 XMIN = -1.4
 XMAX = 1.4
 YMIN = -1.4
