@@ -6,20 +6,27 @@ from PIL import Image, ImageDraw, ImageFont
 
 # timing and scaling
 NUM_STEPS = 400
-MAX_SCALE = 8
+MAX_SCALE = 10
 
 # canvas 
 W = 800
 
+# colors
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+WHITE = (255, 255, 255)
 
 font = ImageFont.load_default()
-  
+
+def circles(image_draw, scale):
+    image_draw.ellipse(
+        (scale * 10, scale * 10, scale * 100, scale * 100), 
+        fill=WHITE, outline=RED
+    )    
+
 def main(filename_base):
     images = []
 
-    black = (0, 0, 0)
-    red = (255, 0, 0)
-    white = (255, 255, 255)
     step_cnt = 1
 
     print(f"START")
@@ -28,15 +35,12 @@ def main(filename_base):
         step_cnt += 1  # count including this step
         print(f"{step_cnt}")
 
-        factor = 1 + MAX_SCALE * step_cnt / NUM_STEPS
+        scale = 1 + MAX_SCALE * step_cnt / NUM_STEPS
 
-        im = Image.new('RGB', (W, W), black)
+        im = Image.new('RGB', (W, W), BLACK)
         d = ImageDraw.Draw(im)
-        d.ellipse(
-            (factor * 10, factor * 10, factor * 100, factor * 100), 
-            fill=white, outline=red
-        )
-        d.multiline_text((10,10), f"{step_cnt}", font=font, fill=white)
+        circles(d, scale)
+        d.multiline_text((10,10), f"{step_cnt}", font=font, fill=WHITE)
 
         images.append(im)
 
