@@ -1,5 +1,7 @@
 import math
+import sys
 from datetime import datetime
+
 from PIL import Image, ImageDraw, ImageFont
 
 # iterations and timing
@@ -73,7 +75,7 @@ def colors_list():
         reds.append((val, 0, 255-val))
     return blues + reds
 
-def main():
+def main(filename_base):
     images = []
 
     black = (0, 0, 0)
@@ -135,8 +137,8 @@ def main():
 
     print("END")
     print(f"THETA={theta}")
-    images[0].save(f"d:\\code\\art\\juliaring{datetime.now().strftime('%Y%m%d%H%M%S')}.gif",
+    images[0].save(f"{filename_base}{datetime.now().strftime('%Y%m%d%H%M%S')}.gif",
                 save_all=True, append_images=images[1:], optimize=False, duration=DURATION, loop=0)
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[0])
