@@ -141,4 +141,4 @@ def main(filename_base):
                 save_all=True, append_images=images[1:], optimize=False, duration=DURATION, loop=0)
 
 if __name__ == "__main__":
-    main(sys.argv[0])
+    main(sys.argv[1])
