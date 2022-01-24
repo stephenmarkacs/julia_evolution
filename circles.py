@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 # timing and scaling
 NUM_STEPS = 400
 MAX_SCALE = 6
+NUM_LEVELS = 9
 
 # canvas 
 W = 800
@@ -19,9 +20,20 @@ WHITE = (255, 255, 255)
 # CIRCLES FRACTAL MATH
 # factor is ratio of the full circle radius to that of the radius of the next larger circles 3
 FACTOR = 1 + 0.5 * ( math.sqrt(3) + ( 1 / math.sqrt(3) ) )
-
+CENTER_TO_SUBCENTER_FACTOR = (FACTOR - 1) / FACTOR
 
 font = ImageFont.load_default()
+
+def colors_list():
+    blues = []
+    reds = []
+    for i in range(1, 8):
+        val = i * 9
+        blues.append((0, 0, val))
+        reds.append((val, 0, 255-val))
+    return blues + reds
+
+COLORS = [(0, 0, 0), (100, 100, 255), (255, 255, 255), (255, 180, 180)]
 
 def circles(image_draw, remain, 
             x, y, r):
@@ -29,18 +41,35 @@ def circles(image_draw, remain,
     # than to have to worry about termination when i recurse
     # may change my mind, thinking...
     if remain > 0:
-        # funny toggle?
-        color = WHITE if remain % 2 else BLACK
-
         # primary circle - can this be the only circle in this iteration?
         image_draw.ellipse(
             (x - r, y - r, x + r, y + r), # bounding box (x0, y0, x1, y1)
-            fill=color, outline=RED
+            fill=COLORS[(NUM_LEVELS + 2 - remain) % 4] #, outline=RED
         )
 
-        # recurse fractally by threes
-        # circles
+        next_lower_radius = CENTER_TO_SUBCENTER_FACTOR * r
 
+        # recurse fractally by threes
+        circles(
+            image_draw, remain - 1,
+            x, 
+            y - next_lower_radius, 
+            r / FACTOR
+        )
+
+        circles(
+            image_draw, remain - 1,
+            x + next_lower_radius * math.sqrt(3) / 2,
+            y + next_lower_radius / 2,
+            r/FACTOR
+        )
+
+        circles(
+            image_draw, remain - 1,
+            x - next_lower_radius * math.sqrt(3) / 2,
+            y + next_lower_radius / 2,
+            r/FACTOR
+        )
 
 
 def main(filename_base):
@@ -60,7 +89,7 @@ def main(filename_base):
         d = ImageDraw.Draw(im)
 
         # the first branch
-        circles(d, 3, 100 * scale, 100 * scale, 100 * scale)
+        circles(d, NUM_LEVELS, 100 * scale, 100 * scale, 100 * scale)
 
         # notations in the corner
         d.multiline_text((10,10), f"{step_cnt}", font=font, fill=WHITE)
