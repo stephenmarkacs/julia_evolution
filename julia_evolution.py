@@ -102,17 +102,16 @@ def main(filename_base):
                 y = YMIN + (j/W) * (YMAX - YMIN)  # and y
                 z = complex(x, y)                 # into complex z
                 cnt = when_exit(z, c)             # see how many iterations of z->z^2 + c before exit from circle of r=2
-                tot_it += cnt                     # increment total iterations
-                if cnt == MAX_IT or cnt == 0:     # ?black if stayed in or was already?
+                tot_it += cnt                     # tally total iterations
+                if cnt == MAX_IT or cnt == 0:     # black if stayed in or started out
                     color = black
                 else:
-                    if cnt > DEEP_CNT_THRESH:
+                    if cnt > DEEP_CNT_THRESH:      
                         deep_cnt += 1             
-                    color = colors[cnt % 30]
+                    color = colors[cnt % 30]      # otherwise designated color spectrum along iteration counts
                 px[i, j] = color
 
-        d = ImageDraw.Draw(im)
-
+        d = ImageDraw.Draw(im)                    # boring complications to insert image into the images list
         now = datetime.now()
         it_factor = tot_it / (W*W)
         deep_factor = deep_cnt / (W*W)
