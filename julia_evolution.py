@@ -91,23 +91,23 @@ def main(filename_base):
 
     while r >= RMIN and r <= RMAX:
         im = Image.new('RGB', (W, W), black)
-        px = im.load()            
-        c = complex(r * math.sin(theta), r * math.cos(theta))
+        px = im.load()  # from image get pixel accessor
+        c = complex(r * math.sin(theta), r * math.cos(theta))  # convert theta and r to a single complex value
         tot_it = 0
         deep_cnt = 0
 
         for i in range(0, W):
             for j in range(0, W):
-                x = XMIN + (i/W) * (XMAX - XMIN)
-                y = YMIN + (j/W) * (YMAX - YMIN)
-                z = complex(x, y)
-                cnt = when_exit(z, c)
-                tot_it += cnt
-                if cnt == MAX_IT or cnt == 0:
+                x = XMIN + (i/W) * (XMAX - XMIN)  # fold x 
+                y = YMIN + (j/W) * (YMAX - YMIN)  # and y
+                z = complex(x, y)                 # into complex z
+                cnt = when_exit(z, c)             # see how many iterations of z->z^2 + c before exit from circle of r=2
+                tot_it += cnt                     # increment total iterations
+                if cnt == MAX_IT or cnt == 0:     # ?black if stayed in or was already?
                     color = black
                 else:
                     if cnt > DEEP_CNT_THRESH:
-                        deep_cnt += 1
+                        deep_cnt += 1             
                     color = colors[cnt % 30]
                 px[i, j] = color
 
