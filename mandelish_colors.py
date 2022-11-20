@@ -13,8 +13,11 @@ def c_sin(z: complex):
 def c_cos(z: complex):
      return cos(z.real) * cos(i * z.imag) - sin(z.real) * sin(i * z.imag)
 
+# fractal rules
+EXPONENT = 2
+
 # iterations and timing
-MAX_IT = 256
+MAX_IT = 128
 AVG_IT_REF = MAX_IT / 2
 HIGH_IT_THRESH = 85
 HIGH_IT_FACTOR = 100
@@ -25,9 +28,9 @@ LOW_DEEP_THRESH = 0.01
 HIGH_DEEP_THRESH = 0.03
 DEEP_ADJUST = 6.0
 GRADIENT_NEUTRAL = 10.0 # avg gradient, gets no adjust
-GRADIENT_SCALE = 2.5    # how much to slow by gradient
+GRADIENT_SCALE = 3.5    # how much to slow by gradient
 GRADIENT_ADJUST_MIN = 0.2
-BLACK_SCALE = 2.0       # how much to slow by blackness
+BLACK_SCALE = 1.2       # how much to slow by blackness
 BLACK_FACTOR_MIN = 0.005
 BLACK_FACTOR_MAX = 0.02
 DURATION = 100
@@ -37,16 +40,15 @@ JUMP_OUT_RADIUS = 2
 NUM_COLORS = 32
 
 #theta
-THETA0 = 1.457 * pi
-TICKS_PER_CIRCLE = 1000
+THETA0 = 0 * pi
+TICKS_PER_CIRCLE = 100
 DTHETA_BASE = (2 * pi) / TICKS_PER_CIRCLE # but there's another factor, reduce this logic!
 THETA_REF = DTHETA_BASE / AVG_IT_REF # AVG_IT_REF sure looks like its doing the same as TICKS_PER_CIRCLE
 
 #r
-RMIN = 0.43442
-DRDTHETA = 0.01 / pi
-RMAX = 0.44
-#RMAX = RMIN + DRDTHETA * 0.1 * pi
+RMIN = 0.2
+DRDTHETA = 0.1 / pi
+RMAX = 1.0
 
 # canvas 
 W = 400
@@ -86,29 +88,11 @@ def it_factor_final(it_factor, deep_factor, gradient_factor, black_factor):
 
 def when_exit(z, c):
     i = 0
-    # lz = 0
     while(abs(z) < JUMP_OUT_RADIUS and i < MAX_IT):
-        # lz = z
-        # z = z * z + c
-        z = z**1.5 + c
+        z = z**EXPONENT + c
         i += 1
 
     return i
-
-    # attemp at smoothing:
-    # if i == 0:
-    #     # out from the start, no iterations
-    #     return 0
-    # elif i == MAX_IT:
-    #     # never went out
-    #     return MAX_IT
-    # else:
-    #     dr = (abs(z) - abs(lz))
-    #     if dr == 0:
-    #         # if div by zero, stop and see what is going on
-    #         import pdb; pdb.set_trace()
-    #     how_far_along = (JUMP_OUT_RADIUS - abs(lz)) / dr  # range: (0,1]
-    #     return i + how_far_along - 1
 
 def f(x):
     return min(255, x) # highlight clipping
@@ -152,6 +136,7 @@ def main():
     print(f"START: r0={r} theta0={theta} DTHETA_BASE={DTHETA_BASE} THETA_REF={THETA_REF}")
     print(f"RMIN={RMIN} RMAX={RMAX} DRDTHETA={DRDTHETA} W={W}")
 
+    # currently not cycling colors, so just get the colors once up front
     colors = colors_cycle(1)
 
     while r >= RMIN and r <= RMAX:
@@ -172,8 +157,8 @@ def main():
                 x = XMIN + (i/W) * (XMAX - XMIN)
                 y = YMIN + (j/W) * (YMAX - YMIN)
                 z = complex(x, y)
-                #cnt = when_exit(z, c) # julia
-                cnt = when_exit(c, z) # standard mandelbrot
+                cnt = when_exit(z, c) # julia
+                #cnt = when_exit(c, z) # standard mandelbrot
                 if last_count is not None:
                     gradient_count += abs(cnt - last_count)
                 tot_it += cnt
@@ -183,25 +168,8 @@ def main():
                 else:
                     if cnt > DEEP_CNT_THRESH:
                         deep_cnt += 1 
-                    try:
-                        color = colors[cnt % NUM_COLORS]
-                        # attempt at smoothing:
-                        # a = int(floor(cnt))
-                        # b = int(ceil(cnt))
-                        # color1 = colors[int(floor(cnt)) % NUM_COLORS]
-                        # color2 = colors[int(ceil(cnt)) % NUM_COLORS]
+                    color = colors[cnt % NUM_COLORS]
 
-                        # x = (cnt - a)
-                        # color = (
-                        #     int(color1[0] * x + color2[0] * (1 - x)),
-                        #     int(color1[1] * x + color2[1] * (1 - x)),
-                        #     int(color1[2] * x + color2[2] * (1 - x))
-                        # )
-
-                        #print(f"cnt: {cnt}, a: {a}, b: {b}, color1: {color1}, color2: {color2}, color: {color}")
-                    except:
-                        print(f"colors (len {len(colors)}): {colors}")
-                        raise
                 px[i, j] = color
                 last_count = cnt
 
@@ -239,14 +207,17 @@ def main():
         dr = sign_dr * DRDTHETA * dtheta
         #print(f"dr={dr}")
         r += dr
-        if r > RMAX:
-            sign_dr = -sign_dr
+
+        # to turn around, if we are terminating based on something other than R
+        # if r > RMAX:
+        #     sign_dr = -sign_dr
+
         step_cnt += 1
         last = now
         
     print("END")
     print(f"THETA={theta}")
-    file_base = f"d:\\code\\art\\fractnew\\mandelish{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    file_base = f"mandelish{datetime.now().strftime('%Y%m%d%H%M%S')}"
     gif = f"{file_base}.gif"
     print(f"writing gif: {gif}")
     images[0].save(gif, save_all=True, append_images=images[1:], optimize=False, duration=DURATION, loop=0)
