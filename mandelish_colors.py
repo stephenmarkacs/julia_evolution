@@ -1,91 +1,96 @@
 from datetime import datetime
-from math import ceil, floor, cos, pi, sin
-from socket import RCVALL_MAX
+from math import cos, pi, sin
+from numba import jit
 
 import moviepy.editor as mp
 from PIL import Image, ImageDraw, ImageFont
 
 i = complex(0, 1)
 
-def c_sin(z: complex):
-    return sin(z.real) * cos(i * z.imag) + cos(z.real) * sin(i * z.imag)
-
-def c_cos(z: complex):
-     return cos(z.real) * cos(i * z.imag) - sin(z.real) * sin(i * z.imag)
-
 # fractal rules
-EXPONENT = 2
+EXPONENT = 1.5
 
 # iterations and timing
-MAX_IT = 128
-AVG_IT_REF = MAX_IT / 2
-HIGH_IT_THRESH = 85
-HIGH_IT_FACTOR = 100
-LOW_IT_THRESH = 70
-LOW_IT_FACTOR = 35
-DEEP_CNT_THRESH = 500
-LOW_DEEP_THRESH = 0.01
-HIGH_DEEP_THRESH = 0.03
-DEEP_ADJUST = 6.0
-GRADIENT_NEUTRAL = 10.0 # avg gradient, gets no adjust
-GRADIENT_SCALE = 3.5    # how much to slow by gradient
-GRADIENT_ADJUST_MIN = 0.2
-BLACK_SCALE = 1.2       # how much to slow by blackness
-BLACK_FACTOR_MIN = 0.005
-BLACK_FACTOR_MAX = 0.02
+MAX_IT = 1024
 DURATION = 100
 JUMP_OUT_RADIUS = 2
+
+# factor controls
+CURVE_COEFF = 5.
+CURVE_BUMP_START = 10
+CURVE_BUMP_END = 25
+
+BLACK_COEFF = 0.0
+BLACK_BUMP_START = 0.004
+BLACK_BUMP_END = 0.025
+
+THETA_COEFF = 8.5      # height of peak theta factor
+THETA_TARGET = 0.6640  # in pi radians, the peak of theta_factor
+THETA_WIDTH = 0.0042   # width of ramps down
 
 #colors
 NUM_COLORS = 32
 
 #theta
-THETA0 = 0 * pi
-TICKS_PER_CIRCLE = 100
-DTHETA_BASE = (2 * pi) / TICKS_PER_CIRCLE # but there's another factor, reduce this logic!
-THETA_REF = DTHETA_BASE / AVG_IT_REF # AVG_IT_REF sure looks like its doing the same as TICKS_PER_CIRCLE
+THETA0 = 0.5168 * pi
+TICKS_PER_CIRCLE = 720
+DTHETA_BASE = (2 * pi) / TICKS_PER_CIRCLE
 
 #r
-RMIN = 0.2
-DRDTHETA = 0.1 / pi
-RMAX = 1.0
+RMIN = 0.4812
+RMAX = 0.48936
+DRDTHETA = 0.03 / pi
+SIGN_DR = -1
 
-# canvas 
-W = 400
-XMIN = -1.4
-XMAX = 1.4
-YMIN = -1.4
-YMAX = 1.4
+# canvas
+W = 800
+XMIN = -0.4
+XMAX = 0.3
+YMIN = -0.7
+YMAX = 0
 
 font = ImageFont.load_default()
 
-# speed adjustment factor
-def it_factor_final(it_factor, deep_factor, gradient_factor, black_factor):
-    if it_factor > HIGH_IT_THRESH:
-        ret =  HIGH_IT_FACTOR
-    elif it_factor < LOW_IT_THRESH:
-        ret = LOW_IT_FACTOR
+################# speed adjustment factors ###################
+# all XXX_factor fns should output in range 0 - 1
+
+@jit(nopython=True)
+def curve_factor_fn(iter_cnt):
+    if iter_cnt < CURVE_BUMP_START:
+        return 0
+    elif iter_cnt < CURVE_BUMP_END:
+        return 1
     else:
-        ret = (
-            LOW_IT_FACTOR + 
-            (HIGH_IT_FACTOR - LOW_IT_FACTOR) * (it_factor - LOW_IT_THRESH) / (HIGH_IT_THRESH - LOW_IT_THRESH)
-        )
+        return 0
 
-    if deep_factor > HIGH_DEEP_THRESH:
-        adjust = DEEP_ADJUST
-    elif deep_factor > LOW_DEEP_THRESH:
-        adjust = 1 + (DEEP_ADJUST - 1) * (deep_factor - LOW_DEEP_THRESH) / (HIGH_DEEP_THRESH - LOW_DEEP_THRESH)
+@jit(nopython=True)
+def black_factor_fn(black_fraction):
+    if black_fraction < BLACK_BUMP_START:
+        return 0
+    elif black_fraction < BLACK_BUMP_END:
+        return 1
     else:
-        adjust = 1
+        return 0
 
-    gradient_adjust = max(GRADIENT_ADJUST_MIN, GRADIENT_SCALE * gradient_factor / GRADIENT_NEUTRAL)
-    adjust *= gradient_adjust    
+@jit(nopython=True)
+def theta_factor_fn(theta):
+    theta_diff = abs(theta/pi - THETA_TARGET)
+    if theta_diff < THETA_WIDTH:
+        return 1
+    elif theta_diff < 2 * THETA_WIDTH:
+        return 1 - (theta_diff - THETA_WIDTH) / THETA_WIDTH
+    else:
+        return 0
 
-    black_adjust = BLACK_SCALE * BLACK_FACTOR_MAX / max(BLACK_FACTOR_MIN, min(black_factor, BLACK_FACTOR_MAX))
-    adjust /= black_adjust
+# @jit(nopython=True)
+# def ramp(a, b, va, vb, x):
+#     if x <= a:
+#         return va
+#     if x >= b:
+#         return vb
+#     return va + ((x - a) / (b - a)) * vb
 
-    return ret / adjust   # speed 
-
+@jit(nopython=True)
 def when_exit(z, c):
     i = 0
     while(abs(z) < JUMP_OUT_RADIUS and i < MAX_IT):
@@ -94,17 +99,19 @@ def when_exit(z, c):
 
     return i
 
+@jit(nopython=True)
 def f(x):
     return min(255, x) # highlight clipping
 
+# to not cycle, just call this once before the time loop
 def colors_cycle(n):
     blues = []
     reds = []
     for i in range(0, int(NUM_COLORS / 2)):
         val = i * (int(NUM_COLORS / 2) + 1)
-        blues.append((0, f(16 + int(val/5)), val))
-        reds.append((val, int(val/2), int((255-val) * 0.65)))
-    
+        blues.append((0, f(int(val/5)), val))
+        reds.append((val, int(val/3), int((255-val) * 0.75)))
+
     uncycled = blues + reds
 
     # twist: rot(n)
@@ -128,12 +135,15 @@ def main():
     black = (0, 0, 0)
     white = (255, 255, 255)
     theta = THETA0
-    r = RMIN
+    #r = RMIN
+    r = RMAX
     step_cnt = 1
     last = datetime.now()
-    sign_dr = 1
+    sign_dr = SIGN_DR
 
-    print(f"START: r0={r} theta0={theta} DTHETA_BASE={DTHETA_BASE} THETA_REF={THETA_REF}")
+    num_pixels = W*W
+
+    print(f"START: r0={r} theta0={theta} DTHETA_BASE={DTHETA_BASE}")
     print(f"RMIN={RMIN} RMAX={RMAX} DRDTHETA={DRDTHETA} W={W}")
 
     # currently not cycling colors, so just get the colors once up front
@@ -141,72 +151,69 @@ def main():
 
     while r >= RMIN and r <= RMAX:
         frame_count += 1
-        #colors = colors_cycle(frame_count)
-        #print(f"colors: {colors}")
+        # colors = colors_cycle(int(frame_count / 5))
         im = Image.new('RGB', (W, W), black)
-        px = im.load()            
+        px = im.load()
         c = complex(r * cos(theta), r * sin(theta))
-        tot_it = 0
-        deep_cnt = 0
-        gradient_count = 0
-        black_count = 0
+        curve_factor = 0.
+        black_count = 0.
 
         for i in range(0, W):
-            last_count = None
+            #last_count = None   # for gradient factors
             for j in range(0, W):
                 x = XMIN + (i/W) * (XMAX - XMIN)
                 y = YMIN + (j/W) * (YMAX - YMIN)
                 z = complex(x, y)
                 cnt = when_exit(z, c) # julia
                 #cnt = when_exit(c, z) # standard mandelbrot
-                if last_count is not None:
-                    gradient_count += abs(cnt - last_count)
-                tot_it += cnt
+
+                # if last_count is not None:
+                #     gradient_count += abs(cnt - last_count)
+
                 if cnt >= MAX_IT or cnt == 0:
                     color = black
                     black_count += 1
                 else:
-                    if cnt > DEEP_CNT_THRESH:
-                        deep_cnt += 1 
+                    # if cnt > DEEP_CNT_THRESH:
+                    #     deep_cnt += 1
                     color = colors[cnt % NUM_COLORS]
+                    curve_factor += curve_factor_fn(cnt)
 
                 px[i, j] = color
-                last_count = cnt
+                # last_count = cnt
+
+        # normalize to avg curve factor
+        curve_factor /= num_pixels   
+        black_fraction = black_count / num_pixels
+        black_factor = black_factor_fn(black_fraction)
+        theta_factor = theta_factor_fn(theta)
 
         d = ImageDraw.Draw(im)
+        d.multiline_text((10, 10), f"z -> z**1.5 + c, z0(pixel), c(t)")
+        d.multiline_text((10,28), f"{XMIN:.1f}<x<{XMAX:.1f} {YMIN:.1f}<y<{YMAX:.1f}", font=font, fill=white)
+        d.multiline_text((10,46), f"r:{r:.5f} theta/pi:{(theta / pi):.4f}", font=font, fill=white)
+        d.multiline_text((10,64), f"curve: {curve_factor:.3f} {'*'*int(20 * curve_factor)}", font=font, fill=white)
+        #d.multiline_text((10,82), f"black:{black_fraction:.3f} {black_factor:.3f} {'*'*int(20 * black_factor)}", font=font, fill=white)
+        d.multiline_text((10,82), f"theta: {theta_factor:.3f} {'*'*int(20 * theta_factor)}", font=font, fill=white)
 
-        now = datetime.now()
-        num_pixels = W*W
-        it_factor = tot_it / num_pixels
-        deep_factor = float(deep_cnt) / num_pixels  # the deep count really just reduces the count to a binary (crossed thresh or not)
-        black_factor = float(black_count) / num_pixels
-        gradient_factor = gradient_count / num_pixels  # average interpixel count delta
-        it_factor_used = it_factor_final(it_factor, deep_factor, gradient_factor, black_factor)
-        #d.multiline_text((10,10), f"z(n+2) = z(n+1)^2 + {double_delay_strength:.2f} * z(n) + c")
-        d.multiline_text((10,10), f"{XMIN:.1f}<x<{XMAX:.1f} {YMIN:.1f}<y<{YMAX:.1f}", font=font, fill=white)
-        d.multiline_text((10,28), f"r:{r:.5f} theta/pi:{(theta / pi):.3f}", font=font, fill=white)
-        # d.multiline_text((10,46), f"deep_factor:{deep_factor:.2f}", font=font, fill=white)
-        # d.multiline_text((10,64), f"it_factor:{it_factor:.2f}", font=font, fill=white)
-        d.multiline_text((10,46), f"if: {it_factor:.1f}, df: {deep_factor:.3f}", font=font, fill=white)
-        d.multiline_text((10,64), f"bf: {black_factor:.3f}, gf: {gradient_factor:.1f}", font=font, fill=white)
-        d.multiline_text((10,82), f"speed:{it_factor_used:.1f}", font=font, fill=white)
-
-        PAD = 10
+        PAD = 20
         PLOT_R = 40
         plot_c(d, W-PAD-PLOT_R, PAD+PLOT_R, PLOT_R, c)
 
         images.append(im)
 
-        print(now - last, step_cnt, r, theta / pi, c, tot_it, it_factor, it_factor_used)
+        final_factor = (1 + CURVE_COEFF * curve_factor) * (1 + BLACK_COEFF * black_factor) * (1 + THETA_COEFF * theta_factor)
 
-        dtheta = THETA_REF * it_factor_used
-        #print(f"dtheta={dtheta} DRDTHETA={DRDTHETA}")
+        now = datetime.now()
+        print(now - last, step_cnt, r, theta / pi, c, curve_factor, black_factor, theta_factor, final_factor)
+
+        dtheta = DTHETA_BASE / final_factor
         theta += dtheta
         if theta > 2 * pi:
             theta -= 2 * pi
         dr = sign_dr * DRDTHETA * dtheta
-        #print(f"dr={dr}")
         r += dr
+        # print(f"curve={curve_factor:.3f} black={black_factor:.3f} final={final_factor:.3f} dtheta={dtheta:.3f} dr={dr:.3f}")
 
         # to turn around, if we are terminating based on something other than R
         # if r > RMAX:
@@ -214,7 +221,7 @@ def main():
 
         step_cnt += 1
         last = now
-        
+
     print("END")
     print(f"THETA={theta}")
     file_base = f"mandelish{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -222,27 +229,10 @@ def main():
     print(f"writing gif: {gif}")
     images[0].save(gif, save_all=True, append_images=images[1:], optimize=False, duration=DURATION, loop=0)
     mp4 = f"{file_base}.mp4"
-    print(f"converting to mp4: {mp4}")
+    print(f"converting to mp4: ./{mp4}")
     video = mp.VideoFileClip(gif)
     video.write_videofile(mp4)
 
 if __name__ == "__main__":
     main()
 
-
-# @tonyophuans interesting locations list
-# {-.432,.580}, {.23,.56}, {.33,.05}, {-.75,.11}, {-.1,.651}
-# , {-.4,-.6}, {-1.26,.38}, {-1.19,.3}, {-.16,1.04}, {-.04,-.99}
-# , {-.36,.64}, {-.1,-.92}, {-.5125,.5215}, {.285,.01}, {-.7454,.113}
-# , {-.7269,.1889}, {-.75,.11}, {.5,.25}, {.3968,-.3628}, {.3511,-.3867}
-# , {.285,.013}, {-.4044,.6133}, {-.7511,.08}, {-.7778,-.1244}, {-1.2178,-.1333}
-# , {-1.1956,-.1733}, {.2978,-.0089}, {.3467,-.04}, {.3556,-.3556}, {.3556,-.3467}
-# , {.3244,-.4267}, {.2844,-.48}, {.1822,-.5911}, {.0933,-.6178}, {.0667,-.6222}
-# , {-.0311,-.6933}, {-.0756,-.6578}, {-.0444,-.8044}, {-1.34882,-.454238}, {.34,-.05}
-# , {.37,.1}, {.355,.355}, {-.54,.54}, {-.52,.57}, {.355534,-.337292}
-# , {-.12,-.77}, {-1.476,0}, {.28,.008}, {.3,-.01}, {-.162,1.04}
-# //50
-# , {-.79,.15}, {-.624,.435}, {.295,.55}, {-.12,.75}, {-1.037,.17}
-# , {-.20242,.39527}, {.38,.333}, {-.36,.62}, {-.67,.34}, {0,1}
-# , {-.75,0}, {-.391,-.587}, {-0.755,0.15},{0.563, 0.0}, {-.7589,-.0753}
-# , {-.16012,1.037572}, {1,.3}
