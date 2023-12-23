@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 i = complex(0, 1)
 
 # fractal rules
-EXPONENT = 1.5
+EXPONENT = 7
 
 # iterations and timing
 MAX_IT = 1024
@@ -20,11 +20,11 @@ CURVE_COEFF = 5.
 CURVE_BUMP_START = 10
 CURVE_BUMP_END = 25
 
-BLACK_COEFF = 0.0
-BLACK_BUMP_START = 0.004
-BLACK_BUMP_END = 0.025
+BLACK_COEFF = 5.
+BLACK_BUMP_START = 0.05
+BLACK_BUMP_END = 0.15
 
-THETA_COEFF = 8.5      # height of peak theta factor
+THETA_COEFF = 0.0      # height of peak theta factor
 THETA_TARGET = 0.6640  # in pi radians, the peak of theta_factor
 THETA_WIDTH = 0.0042   # width of ramps down
 
@@ -32,22 +32,22 @@ THETA_WIDTH = 0.0042   # width of ramps down
 NUM_COLORS = 32
 
 #theta
-THETA0 = 0.5168 * pi
+THETA0 = 0
 TICKS_PER_CIRCLE = 720
 DTHETA_BASE = (2 * pi) / TICKS_PER_CIRCLE
 
 #r
-RMIN = 0.4812
-RMAX = 0.48936
-DRDTHETA = 0.03 / pi
+RMIN = 0.644
+RMAX = 0.649
+DRDTHETA = 0 # 0.06 / pi
 SIGN_DR = -1
 
 # canvas
-W = 800
-XMIN = -0.4
-XMAX = 0.3
-YMIN = -0.7
-YMAX = 0
+W = 500
+XMIN = -1.4
+XMAX = 1.4
+YMIN = -1.4
+YMAX = 1.4
 
 font = ImageFont.load_default()
 
@@ -135,9 +135,9 @@ def main():
     black = (0, 0, 0)
     white = (255, 255, 255)
     theta = THETA0
-    #r = RMIN
-    r = RMAX
+    r = RMIN if SIGN_DR >= 0 else RMAX
     step_cnt = 1
+    total_delta_theta = 0
     last = datetime.now()
     sign_dr = SIGN_DR
 
@@ -146,12 +146,12 @@ def main():
     print(f"START: r0={r} theta0={theta} DTHETA_BASE={DTHETA_BASE}")
     print(f"RMIN={RMIN} RMAX={RMAX} DRDTHETA={DRDTHETA} W={W}")
 
-    # currently not cycling colors, so just get the colors once up front
-    colors = colors_cycle(1)
+    # colors = colors_cycle(1)
 
-    while r >= RMIN and r <= RMAX:
+    # while r >= RMIN and r <= RMAX:
+    while total_delta_theta <= 2 * pi:
         frame_count += 1
-        # colors = colors_cycle(int(frame_count / 5))
+        colors = colors_cycle(int(frame_count / 5))
         im = Image.new('RGB', (W, W), black)
         px = im.load()
         c = complex(r * cos(theta), r * sin(theta))
@@ -193,8 +193,8 @@ def main():
         d.multiline_text((10,28), f"{XMIN:.1f}<x<{XMAX:.1f} {YMIN:.1f}<y<{YMAX:.1f}", font=font, fill=white)
         d.multiline_text((10,46), f"r:{r:.5f} theta/pi:{(theta / pi):.4f}", font=font, fill=white)
         d.multiline_text((10,64), f"curve: {curve_factor:.3f} {'*'*int(20 * curve_factor)}", font=font, fill=white)
-        #d.multiline_text((10,82), f"black:{black_fraction:.3f} {black_factor:.3f} {'*'*int(20 * black_factor)}", font=font, fill=white)
-        d.multiline_text((10,82), f"theta: {theta_factor:.3f} {'*'*int(20 * theta_factor)}", font=font, fill=white)
+        d.multiline_text((10,82), f"black:{black_fraction:.3f} {black_factor:.3f} {'*'*int(20 * black_factor)}", font=font, fill=white)
+        d.multiline_text((10,100), f"theta: {theta_factor:.3f} {'*'*int(20 * theta_factor)}", font=font, fill=white)
 
         PAD = 20
         PLOT_R = 40
@@ -209,6 +209,7 @@ def main():
 
         dtheta = DTHETA_BASE / final_factor
         theta += dtheta
+        total_delta_theta += dtheta
         if theta > 2 * pi:
             theta -= 2 * pi
         dr = sign_dr * DRDTHETA * dtheta
