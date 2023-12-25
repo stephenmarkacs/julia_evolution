@@ -6,6 +6,7 @@ from enum import Enum
 import moviepy.editor as mp
 from PIL import Image, ImageDraw, ImageFont
 
+# num_nodes gives the number of nodes in the fractal as a function of numRecursions
 num_nodes = [0]
 for i in range(1, 40):
     num_nodes.append((4 * num_nodes[-1]) + 3)
@@ -30,7 +31,7 @@ REDS = [(64 + 48 * i, 32, 64) for i in range(0,4)]
 GREENS = [(32, 64 + 48 * i, 64) for i in range(0,4)]
 
 # iteration and timing
-RECURSION_DEPTH = 5
+RECURSION_DEPTH = 7
 FRAME_MAX = 256
 DURATION = 100
 
@@ -61,7 +62,7 @@ def cwise(orientation):
 def ccwise(orientation):
     return CCW_ROTATOR.get(orientation)
 
-
+# sizes gives how wide the fractal is as a function of numRecursions
 sizes = [0.0]
 n = 0
 val = 0.0
@@ -86,16 +87,14 @@ def hilby(draw, numRecursions, minIndex, chirality, p1, p2, orientation):
 
     if numRecursions == 0:
         color_index = -(minIndex + frame_count) % 64
-        if color_index < 4 or (color_index + 32) % 64 < 4:
-            ellipse_size = 5
-            color = REDS[color_index] if color_index < 4 else GREENS[(color_index + 32) % 64]
-            #print(f"ELLIPSE: ({p1}, {p2})")
-            draw.ellipse((
-                        (p1[0] - ellipse_size, p1[1] - ellipse_size), 
-                        (p2[0] + ellipse_size, p2[1] + ellipse_size), 
-                        ), 
-                        outline=color, 
-                        width=2)
+        ellipse_size = 3
+        color = COLORS[color_index]
+        draw.ellipse((
+                    (p1[0] - ellipse_size, p1[1] - ellipse_size), 
+                    (p2[0] + ellipse_size, p2[1] + ellipse_size), 
+                    ), 
+                    outline=color, 
+                    width=2)
     else:
         # ---- 4 recursions ----
         xmin, xmax = p1[0], p2[0]
