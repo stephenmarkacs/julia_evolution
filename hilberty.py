@@ -6,6 +6,11 @@ from enum import Enum
 import moviepy.editor as mp
 from PIL import Image, ImageDraw, ImageFont
 
+num_nodes = [0]
+for i in range(1, 40):
+    num_nodes.append((4 * num_nodes[-1]) + 3)
+print(f"num_nodes: {num_nodes}")
+
 # canvas
 WIDTH = 500
 XMIN = 0
@@ -20,9 +25,13 @@ WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
+COLORS = [(4*i, 256-(4*i), 64) for i in range(0,64)]
+REDS = [(64 + 48 * i, 32, 64) for i in range(0,4)]
+GREENS = [(32, 64 + 48 * i, 64) for i in range(0,4)]
 
 # iteration and timing
-FRAME_MAX = 2
+RECURSION_DEPTH = 5
+FRAME_MAX = 256
 DURATION = 100
 
 
@@ -61,18 +70,32 @@ while val < WIDTH:
     n += 1
     sizes.append(val)
 
+frame_count = 0
 
-def hilby(draw, numRecursions, p1, p2, orientation):
+def hilby(draw, numRecursions, minIndex, chirality, p1, p2, orientation):
+    global frame_count
     if numRecursions < 0:
         return 
 
     color = RED if numRecursions % 3 == 0 else GREEN if numRecursions % 3 == 1 else BLUE
-    print(f"ENTER hilby(draw, {numRecursions}, {p1}, {p2}, {orientation}): {color}")
+    #print(f"ENTER hilby(draw, {numRecursions}, {minIndex}, {chirality}, {p1}, {p2}, {orientation}): {color}")
 
     #draw.ellipse((p1, p2), outline=color, width=3)
 
+    indexOffset = minIndex - 1
+
     if numRecursions == 0:
-        pass
+        color_index = -(minIndex + frame_count) % 64
+        if color_index < 4 or (color_index + 32) % 64 < 4:
+            ellipse_size = 5
+            color = REDS[color_index] if color_index < 4 else GREENS[(color_index + 32) % 64]
+            #print(f"ELLIPSE: ({p1}, {p2})")
+            draw.ellipse((
+                        (p1[0] - ellipse_size, p1[1] - ellipse_size), 
+                        (p2[0] + ellipse_size, p2[1] + ellipse_size), 
+                        ), 
+                        outline=color, 
+                        width=2)
     else:
         # ---- 4 recursions ----
         xmin, xmax = p1[0], p2[0]
@@ -89,8 +112,8 @@ def hilby(draw, numRecursions, p1, p2, orientation):
         recursion_zones = [
             ((xmin, ymin + y_step + y_connect), (xmin + x_step, ymax)), # bottom left
             ((xmin + x_step + x_connect, ymin + y_step + y_connect), (xmax, ymax)), # bottom right
-            ((xmin, ymin), (xmin + x_step, ymin + y_step)), # up left
             ((xmin + x_step + x_connect, ymin), (xmax, ymin + y_step)), # up right
+            ((xmin, ymin), (xmin + x_step, ymin + y_step)), # up left
         ]
 
         def rot(zones, qtrs):
@@ -107,56 +130,75 @@ def hilby(draw, numRecursions, p1, p2, orientation):
 
             return ret
 
-        tester = [10, 20, 30, 40]
-        print(tester)
-        print(rot(tester, 1))
-        print(rot(tester, 2))
-        print(rot(tester, 3))
-        raise 
-
         shifties = rot(recursion_zones, orientation.value)
-        print(f"shifties = {shifties}")
+        #print(f"shifties = {shifties}")
 
-        # 2 bottoms match orientation with parent
+        index0 = 1
+        index1 = 2**(2 * numRecursions)
+        index2 = 2 * index1
+        index3 = 3 * index1
+
+        # up left is rotated counter-clockwise
+        hilby(draw, 
+              numRecursions - 1, 
+              indexOffset + (index0 if chirality else index3), 
+              not chirality, 
+              *shifties[3], 
+              ccwise(orientation)
+        )
+
         # bottom left
-        print(f"bottom left")
-        hilby(draw, numRecursions - 1, *shifties[0], orientation)
+        hilby(draw, 
+              numRecursions - 1,
+              indexOffset + (index1 if chirality else index2), 
+              chirality, 
+              *shifties[0], 
+              orientation
+        )
 
         # bottom right
-        print(f"bottom right")
-        hilby(draw, numRecursions - 1, *shifties[1], orientation)
+        hilby(draw, 
+              numRecursions - 1, 
+              indexOffset + (index2 if chirality else index1), 
+              chirality, 
+              *shifties[1], 
+              orientation
+        )
 
-        # # up left is rotated counter-clockwise
-        # print(f"up left")
-        # hilby(draw, numRecursions - 1, *shifties[2], ccwise(orientation))
+        # up right is rotated clockwise
+        hilby(draw, 
+              numRecursions - 1, 
+              indexOffset + (index3 if chirality else index0), 
+              not chirality, 
+              *shifties[2], 
+              cwise(orientation)
+        )
 
-        # # up right is rotated clockwise
-        print(f"up right")
-        hilby(draw, numRecursions - 1, *shifties[3], cwise(orientation))
-
+        line_width = 1
 
         # ---- 3 connections ----
+
         # 2 side connectors are on the outside
         if orientation in (Orientation.UP, Orientation.DOWN):
             # left and right walls
             draw.line((
                 (xmin, ymin + y_step), 
                 (xmin, ymin + y_step + y_connect)
-            ), fill=color, width=4)
+            ), fill=WHITE, width=line_width)
             draw.line((
                 (xmax, ymin + y_step), 
                 (xmax, ymin + y_step + y_connect)
-            ), fill=color, width=4)
+            ), fill=WHITE, width=line_width)
         else:
             # top and bottom walls
             draw.line((
                 (xmin + x_step, ymin),
                 (xmin + x_step + x_connect, ymin)
-            ), fill=color, width=4)
+            ), fill=WHITE, width=line_width)
             draw.line((
                 (xmin + x_step, ymax),
                 (xmin + x_step + x_connect, ymax)
-            ), fill=color, width=4)
+            ), fill=WHITE, width=line_width)
 
         # 1 middle connector is in the middle
         up_left =    (xmin + x_step,                ymin + y_step)
@@ -166,16 +208,14 @@ def hilby(draw, numRecursions, p1, p2, orientation):
         draw.line((
             up_left if orientation in (Orientation.DOWN, Orientation.RIGHT) else down_right,
             up_right if orientation in (Orientation.DOWN, Orientation.LEFT) else down_left
-        ), fill=color, width=4)
+        ), fill=WHITE, width=line_width)
 
-    print(f"<-EXIT hilby(draw, {numRecursions}, {p1}, {p2}, {orientation}): {color}")
+    #print(f"<-EXIT hilby(draw, {numRecursions}, {minIndex}, {chirality}, {p1}, {p2}, {orientation}): {color}")
 
 
 def main():
     images = []
-    frame_count = 0
-
-    frame_count = 1
+    global frame_count
 
     while frame_count < FRAME_MAX:
         print(f"calc frame {frame_count}")
@@ -184,7 +224,13 @@ def main():
         frame = im.load()
         draw = ImageDraw.Draw(im)
 
-        hilby(draw, 3, (XMIN + MARGIN, YMIN + MARGIN), (XMAX - MARGIN, YMAX - MARGIN), Orientation.UP)
+        hilby(draw, 
+              RECURSION_DEPTH, # recursion depth
+              1, # starting index
+              True, # chirality flag
+              (XMIN + MARGIN, YMIN + MARGIN), (XMAX - MARGIN, YMAX - MARGIN), # bounding box
+              Orientation.UP # direction this current U opens to
+        )
 
         images.append(im)
 
