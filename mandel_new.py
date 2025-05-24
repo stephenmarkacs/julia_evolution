@@ -44,7 +44,7 @@ FRAME_WIDTH_PIXELS = 500
 MAX_STEPS = 2000
 
 # mandel iteration: iterations are per image frame, per pixel
-MAX_IT = 64  # max number of iterations of z->z**2+c per pixel
+MAX_IT = 128  # max number of iterations of z->z**2+c per pixel
 
 # speed factor configs
 DEEP_IT_CNT_THRESH = 32
@@ -92,7 +92,7 @@ def main():
         d = ImageDraw.Draw(im)
 
         # add text showing where we're at onto the image
-        d.multiline_text((10,10), f"[{r:.3f} {theta:.3f}]", font=font, fill=white)
+        d.multiline_text((10,10), f"r={r:.3f} theta={theta:.3f}", font=font, fill=white)
 
         # append image to image list
         images.append(im)
