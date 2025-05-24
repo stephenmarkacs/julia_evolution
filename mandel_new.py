@@ -21,8 +21,8 @@ def colors_list():
     for i in range(0, 16):
         val = i * 15
         reds.append((val, 0, 255-val))
-        blues.append((0, 0, val))
         whites.append((val, val, val))
+        blues.append((0, 0, val))
     return reds + whites + blues
 
 # evolving location in the complex plane of c
