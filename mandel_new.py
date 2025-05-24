@@ -23,7 +23,7 @@ def colors_list():
         blues.append((0, 0, val))
         reds.append((val, 0, 255-val))
         whites.append((val, val, val))
-    return blues + reds
+    return reds + whites + blues
 
 # evolving location in the complex plane of c
 THETA0 = 0    # ?in radians?
@@ -38,7 +38,7 @@ YMIN = -2
 YMAX = 2
 
 # how that chunk of complex z is laid on screen
-FRAME_WIDTH_PIXELS = 400
+FRAME_WIDTH_PIXELS = 500
 
 # animation time: STEPS IS t IN THE VIDEO
 MAX_STEPS = 2000
