@@ -17,10 +17,12 @@ def when_exit(z, c):
 def colors_list():
     blues = []
     reds = []
+    whites = []
     for i in range(0, 16):
         val = i * 15
         blues.append((0, 0, val))
         reds.append((val, 0, 255-val))
+        whites.append((val, val, val))
     return blues + reds
 
 # evolving location in the complex plane of c
@@ -39,7 +41,7 @@ YMAX = 2
 FRAME_WIDTH_PIXELS = 400
 
 # animation time: STEPS IS t IN THE VIDEO
-MAX_STEPS = 1500
+MAX_STEPS = 2000
 
 # mandel iteration: iterations are per image frame, per pixel
 MAX_IT = 64  # max number of iterations of z->z**2+c per pixel
@@ -84,7 +86,7 @@ def main():
                 else:
                     if cnt > DEEP_IT_CNT_THRESH:
                         deep_cnt += 1
-                    color = colors[cnt % 32]
+                    color = colors[cnt % 48]
                 px[i, j] = color
 
         d = ImageDraw.Draw(im)
