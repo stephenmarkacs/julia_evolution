@@ -15,9 +15,9 @@ def when_exit(z, c):
     return i  
 
 def colors_list():
-    blues = []
     reds = []
     whites = []
+    blues = []
     for i in range(0, 16):
         val = i * 15
         reds.append((val, 0, 255-val))
